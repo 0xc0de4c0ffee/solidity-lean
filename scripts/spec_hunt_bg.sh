@@ -137,10 +137,13 @@ cmd_one() {
   fi
 
   # rc 1 is the CLI's "adjudicated, not a qualifying divergence" signal.
-  if [[ -s "$out" ]] && jq -e '.verdict' "$out" >/dev/null 2>&1; then
-    jq -r '.verdict' "$out" > "$verdict"
-    printf '%-28s %-16s %s\n' "$(jq -r '.verdict' "$out")" \
-      "$(jq -r '.lane // "-"' "$out")" "$input" >> "$run_dir/summary.tsv"
+  # The harness prints a diagnostic line before the report; keep it in .json and
+  # extract the top-level JSON object (only its first line starts in column 0).
+  sed -n '/^{/,$p' "$out" > "$out.report" 2>/dev/null || true
+  if [[ -s "$out.report" ]] && jq -e '.verdict' "$out.report" >/dev/null 2>&1; then
+    jq -r '.verdict' "$out.report" > "$verdict"
+    printf '%-28s %-16s %s\n' "$(jq -r '.verdict' "$out.report")" \
+      "$(jq -r '.lane // "-"' "$out.report")" "$input" >> "$run_dir/summary.tsv"
   else
     printf 'ERROR(%s)' "$rc" > "$verdict"
     printf '%-28s %-16s %s\n' "ERROR($rc)" "-" "$input" >> "$run_dir/summary.tsv"
