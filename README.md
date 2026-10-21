@@ -57,6 +57,10 @@ scripts/compare_forge_solc_interpreter.sh   # replay corpus vs real EVM
 python3 -m contest.run_samples  # contest harness end-to-end suite
 ```
 
+For the day-to-day divergence loop — single-file probes, parallel background
+runs, and cache setup — see
+[docs/SPEC_HUNT_WORKBENCH.md](docs/SPEC_HUNT_WORKBENCH.md).
+
 ## Repository map
 
 | Path | What |
