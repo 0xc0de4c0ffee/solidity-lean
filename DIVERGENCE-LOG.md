@@ -9,6 +9,28 @@ Chronological log of every model↔solc divergence found during the semantics-ha
 
 _Log opened 2026-07-10 07:xx PDT. Rows above #52 predate this log; see the task tracker (#13–#51) for the full earlier history._
 
+## Verification snapshot — 2026-10-21 (branch `spec-hunt`, `main` @ `16843fd`)
+
+Reran the exact repros for rows still marked `found` / `queued` / `UNBLOCKED`,
+plus a 63-probe sweep of adjacent areas, through the single-file adjudicator
+(pinned solc 0.8.35 + Forge + Lean 4.28.0 + native `specHuntRunner`). **All
+returned `NO_DIVERGENCE`.**
+
+- **Re-verified fixed:** #193, #196, #198, #201 (A–D), #202, #204 — reproducible
+  from [`probes/verify/`](probes/verify/README.md). The statuses in the table
+  below are historical; the WS1/WS2 fix batches are already on `main`.
+- **Negative results (earned negatives — do not re-investigate):**
+  memory-to-memory alias/copy semantics (struct/array/bytes assignment, memory
+  parameters mutating the caller, storage→memory copies); evaluation order at
+  struct-ctor, array-literal, tuple-assign, return-tuple, mapping-store,
+  array-store, compound-assign, `abi.encode`, `bytes.concat` and `string.concat`
+  sites; UDVT packed widths and storage packing/mapping keys; mutability
+  enforcement (`view`/`pure` direct reads, internal-call propagation, `receive`
+  payability, constructor purity); unicode/escape/adjacent string literals; and
+  call hoisting in revert, delete-index, slice-bound, `new`-length,
+  `bytes.concat`, `abi.encodeCall`, named struct-ctor and ternary-index
+  positions. Every one matched solc+EVM.
+
 | Found (PDT) | # | Divergence | Class | Reach | Status |
 |---|---|---|---|---|---|
 | 2026-07-12 19:xx | 205 | WS1-ENV-AUDIT-BATCH (6 NEW narrow-cleanup divergences found by WS1's 32-probe env-audit battery, all EVM-verified 32/32 Forge PASS, uint8 a=200 b=100): env-less PRIMARY lowering positions beyond #201 that skip narrow (uintN<256) checked-arith Panic 0x11. (1) `new uint256[](a+b)` → EVM Panic 0x11, model RET 300 (env `Expr.newExpr` arm + vardecl/return reroute). (2) `this.sink(a+b)` external-call arg → EVM Panic 0x11, model wrong revert (callee-side decode) — fixed by threading optional `argEnvLower` through the whole `externalCallAbi…/toExternalCall…WithReturns/SingleReturn/Return/Discard/AssignVars/AssignBindings` chain (Lean default-arg ⇒ zero churn) at 34 dispatcher sites. (3) `try this.sink(a+b)` → EVM Panic 0x11 UNCAUGHT, model RET 99 (catch swallowed it) — same fix. (4) `addmod(a+b,1,7)` → EVM Panic 0x11, model RET 0 (=(300+1)%7) (env addmod/mulmod arm). (5) `arr[arr[a+b]]` → EVM Panic 0x11, model Panic 0x32 OOB (flag recursion into `Expr.index` + wide-key gate). (6) `uint8[2] t=[a+b,1]` → EVM Panic 0x11, model OVER-REJECT whole contract (env `Expr.array` arm + new `Exprs.toCoreAsListWithEnvFuel?`). Fns in Interface.lean: `Expr.abiArgNeedsEnvCleanupFuel?` (~7935), `abiBuiltinArgsNeedEnvCleanup` (~8016), `toCoreAsWithEnvFuel?` (~8420-8700), `externalCallAbiWithKindEnv?`+chain (~6100-6460). Controls green (already env-aware): named emit/revert args, struct ctors, tuple assign/decl, lib/fn-ptr/modifier args, push(a+b), for-init, delete m8[a+b], indexed/two-phase emit. Class: wrong-value/missing-panic + one over-reject; replay-reachable | wrong-value/over-reject | replay | MERGED pending batched gate (main c3c0073..403390d; WS1 env-audit; folds in #201 + #196 gensym; full build green 1147 jobs, NO proof change; 65-guard witness + 2 Forge lanes 61 tests + 12-lane self-gate green; batched WS2+WS3+WS1 replay GREEN 265/265 — Program-2 rearch complete & locked) — GATED |
